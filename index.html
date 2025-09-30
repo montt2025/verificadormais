@@ -3,184 +3,198 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Buscador CFM – Web Responsivo</title>
+  <title>Verificador de Cartolas MAIS</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .chip{display:inline-block;padding:.15rem .5rem;border:1px solid #e5e7eb;border-radius:9999px;font-size:.75rem;color:#6b7280}
+    .cell{padding:.5rem .75rem;border-bottom:1px solid #d1d5db}
+    .cell-label{background:#e5f0ff;font-weight:600}
+    .card{box-shadow:0 10px 25px rgba(0,0,0,.06);border-radius:.75rem;overflow:hidden;border:1px solid #e5e7eb}
+    .hdr{background:linear-gradient(180deg,#5aa2ff,#2768c9);color:#fff}
+    .note{background:#fff6bf;color:#6b7280;border-bottom:1px solid #e5e7eb}
+    .val{min-height:2.25rem;display:flex;align-items:center}
+    .pill{display:inline-block;background:#eff6ff;color:#1f2937;border:1px solid #dbeafe;border-radius:9999px;padding:.125rem .5rem;font-size:.75rem}
+    .btn{background:#2563eb;color:#fff;border-radius:.5rem;padding:.5rem .9rem}
+    .btn:disabled{opacity:.6}
+    input[type="text"]{outline:none}
   </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
-  <div class="min-h-screen">
-    <header class="sticky top-0 z-10 backdrop-blur bg-white/70 border-b">
-      <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h1 class="text-2xl font-semibold">Buscador CFM – Web Responsivo</h1>
-        <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-          <input id="q" placeholder="Buscar… (RUT, Nombre, Dirección, Cartola, etc.)"
-                 class="w-full md:w-96 rounded-2xl border px-4 py-2 focus:outline-none focus:ring"/>
-          <select id="field" class="rounded-2xl border px-3 py-2"></select>
+  <div class="min-h-screen flex items-start justify-center p-4">
+    <div class="w-full max-w-2xl card bg-white">
+      <!-- Encabezado -->
+      <div class="hdr p-4">
+        <h1 class="text-xl font-bold tracking-wide">VERIFICADOR DE CARTOLAS MAIS</h1>
+        <div class="text-sm opacity-95">(Ingresar Run del paciente índice o familiares)</div>
+      </div>
+      <!-- Nota -->
+      <div class="note px-4 py-2 text-sm">
+        <span class="pill mr-2">RUN sin puntos</span> con guión y dígito verificador (ej: 5186407-7)
+      </div>
+
+      <!-- Cuerpo tipo “tabla” -->
+      <div>
+        <!-- Fila: Ingresar RUN -->
+        <div class="grid grid-cols-3 sm:grid-cols-4">
+          <div class="cell cell-label col-span-1">Ingresar R.U.N</div>
+          <div class="cell col-span-2 sm:col-span-2">
+            <div class="flex gap-2">
+              <input id="rut" type="text" placeholder="12.345.678-9"
+                     class="w-full border rounded-md px-3 py-2" />
+              <button id="buscar" class="btn">Buscar</button>
+            </div>
+          </div>
+          <div class="cell col-span-3 sm:col-span-1 text-right text-sm text-gray-500">
+            <span id="status" class="align-middle"></span>
+          </div>
+        </div>
+
+        <!-- Fila: Nombre -->
+        <div class="grid grid-cols-3 sm:grid-cols-4">
+          <div class="cell cell-label">Nombre</div>
+          <div class="cell val col-span-2 sm:col-span-3" id="vNombre">—</div>
+        </div>
+
+        <!-- Fila: N° de Cartola -->
+        <div class="grid grid-cols-3 sm:grid-cols-4">
+          <div class="cell cell-label">N° de Cartola</div>
+          <div class="cell val col-span-2 sm:col-span-3" id="vCartola">—</div>
+        </div>
+
+        <!-- Fila: N° de Familia -->
+        <div class="grid grid-cols-3 sm:grid-cols-4">
+          <div class="cell cell-label">N° de Familia</div>
+          <div class="cell val col-span-2 sm:col-span-3" id="vFamilia">—</div>
+        </div>
+
+        <!-- Fila: Dirección -->
+        <div class="grid grid-cols-3 sm:grid-cols-4">
+          <div class="cell cell-label">Dirección</div>
+          <div class="cell val col-span-2 sm:col-span-3" id="vDireccion">—</div>
+        </div>
+
+        <!-- Fila: Telefono -->
+        <div class="grid grid-cols-3 sm:grid-cols-4">
+          <div class="cell cell-label">Telefono</div>
+          <div class="cell val col-span-2 sm:col-span-3" id="vTelefono">—</div>
+        </div>
+
+        <!-- Fila: Sector -->
+        <div class="grid grid-cols-3 sm:grid-cols-4">
+          <div class="cell cell-label">Sector</div>
+          <div class="cell val col-span-2 sm:col-span-3" id="vSector">—</div>
+        </div>
+
+        <!-- Fila: Riesgo -->
+        <div class="grid grid-cols-3 sm:grid-cols-4">
+          <div class="cell cell-label">Riesgo</div>
+          <div class="cell val col-span-2 sm:col-span-3" id="vRiesgo">—</div>
         </div>
       </div>
-    </header>
-
-    <main class="max-w-6xl mx-auto px-4 py-6 space-y-4">
-      <div id="error" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm"></div>
-
-      <div class="flex items-center gap-2 text-sm">
-        <span class="text-gray-600">Ordenar por:</span>
-        <select id="sortKey" class="rounded-xl border px-2 py-1"></select>
-        <button id="sortDir" class="rounded-xl border px-3 py-1" title="Cambiar orden">Ascendente</button>
-        <span id="count" class="ml-auto text-gray-500">0 resultado(s)</span>
-      </div>
-
-      <div id="loading" class="p-6 rounded-2xl bg-white shadow">Cargando datos…</div>
-
-      <!-- Tabla desktop -->
-      <div class="hidden md:block">
-        <div class="overflow-auto rounded-2xl shadow">
-          <table class="min-w-full text-sm bg-white">
-            <thead class="bg-gray-100"><tr id="tableHead"></tr></thead>
-            <tbody id="tableBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Tarjetas móvil -->
-      <div id="cards" class="grid md:hidden gap-3"></div>
-
-      <div class="bg-white rounded-2xl p-4 shadow border">
-        <div class="font-semibold mb-2">Ayuda</div>
-        <div class="text-sm text-gray-600">
-          Si aparece <span class="chip">Unexpected token &lt;</span>, la API devolvió HTML (revisa URL/permiso).
-        </div>
-      </div>
-    </main>
-
-    <footer class="max-w-6xl mx-auto px-4 py-8 text-sm text-gray-500">
-      <p>Si cambian los encabezados en la hoja, actualiza FIELD_ORDER y FILTERABLE_FIELDS.</p>
-    </footer>
+    </div>
   </div>
 
   <script>
-    // ===== Config =====
-    // 🔁 Reemplaza por tu URL de Web App de Apps Script (deployment /exec) + ?action=data
+    // ⬇️ Cambia por tu URL de Apps Script Web App (deployment /exec) con ?action=data
     const API_URL = "https://script.google.com/macros/s/TU_DEPLOY_ID/exec?action=data";
 
-    const FIELD_ORDER = [
-      "N° CARTOLA INTERNA","N° FAMILIA","Nombres","Apellido Paterno","Apellido Materno",
-      "DIRECCIÓN","NUMERO DE CONTACTO PRINCIPAL","SECTOR","Clasificación del Riesgo Familiar",
-    ];
-    const FILTERABLE_FIELDS = [
-      { key:"todos",label:"Todos los campos" },
-      { key:"N° CARTOLA INTERNA",label:"N° Cartola Interna" },
-      { key:"N° FAMILIA",label:"N° Familia" },
-      { key:"RUT",label:"RUT" },
-      { key:"Nombres",label:"Nombres" },
-      { key:"DIRECCIÓN",label:"Dirección" },
-      { key:"NUMERO DE CONTACTO PRINCIPAL",label:"Teléfono" },
-      { key:"SECTOR",label:"Sector" },
-      { key:"Clasificación del Riesgo Familiar",label:"Clasificación de Riesgo" },
-    ];
+    // Nombres de columnas del Sheet (deben existir tal cual)
+    const COLS = {
+      rut: "RUT",
+      cartola: "N° CARTOLA INTERNA",
+      familia: "N° FAMILIA",
+      nombres: "Nombres",
+      apPat: "Apellido Paterno",
+      apMat: "Apellido Materno",
+      direccion: "DIRECCIÓN",
+      telefono: "NUMERO DE CONTACTO PRINCIPAL",
+      sector: "SECTOR",
+      riesgo: "Clasificación del Riesgo Familiar"
+    };
 
-    // ===== Util =====
-    function debounce(fn, d){ let t=0; return function(){ clearTimeout(t); const a=arguments,c=this; t=setTimeout(()=>fn.apply(c,a), d||250); }; }
+    // Estado
+    let DATA = []; // filas del sheet
 
-    // ===== Estado =====
-    var state = { data:[], loading:true, error:"", q:"", field:"todos", sortKey:FIELD_ORDER[0], sortDir:"asc" };
-    function setState(p){ state=Object.assign({}, state, p); render(); }
-
-    function renderControls(){
-      const f=document.getElementById('field'); f.innerHTML='';
-      FILTERABLE_FIELDS.forEach(x=>{ const o=document.createElement('option'); o.value=x.key; o.textContent=x.label; if(state.field===x.key)o.selected=true; f.appendChild(o); });
-      const s=document.getElementById('sortKey'); s.innerHTML='';
-      FIELD_ORDER.forEach(h=>{ const o=document.createElement('option'); o.value=h; o.textContent=h; if(state.sortKey===h)o.selected=true; s.appendChild(o); });
-      document.getElementById('sortDir').textContent = (state.sortDir==='asc'?'Ascendente':'Descendente');
+    // Helpers
+    const $ = (id) => document.getElementById(id);
+    function normalizeRut(r) {
+      if (!r) return "";
+      return String(r).toUpperCase()
+        .replace(/\./g, "").replace(/\s+/g, "")
+        .replace(/[^0-9K-]/g, "");           // deja dígitos, K y guion
+    }
+    function equalsRut(a,b){
+      const x = normalizeRut(a).replace(/-/g, "");
+      const y = normalizeRut(b).replace(/-/g, "");
+      return x === y;
+    }
+    function joinName(row){
+      const parts = [row[COLS.nombres], row[COLS.apPat], row[COLS.apMat]]
+        .map(x => (x||"").toString().trim()).filter(Boolean);
+      return parts.join(" ").toUpperCase() || "—";
+    }
+    function setRow(row){
+      $("vNombre").textContent   = joinName(row);
+      $("vCartola").textContent  = row[COLS.cartola]  ?? "—";
+      $("vFamilia").textContent  = row[COLS.familia]  ?? "—";
+      $("vDireccion").textContent= row[COLS.direccion]?? "—";
+      $("vTelefono").textContent = row[COLS.telefono] ?? "—";
+      $("vSector").textContent   = row[COLS.sector]   ?? "—";
+      $("vRiesgo").textContent   = row[COLS.riesgo]   ?? "—";
+    }
+    function clearValues(){
+      ["vNombre","vCartola","vFamilia","vDireccion","vTelefono","vSector","vRiesgo"]
+        .forEach(id => $(id).textContent = "—");
     }
 
-    function computeFiltered(){
-      const q=String(state.q||'').trim().toLowerCase();
-      let rows=state.data.slice();
-      if(q){
-        rows=rows.filter(r=> state.field==='todos'
-          ? FIELD_ORDER.some(f=>String(r[f]||'').toLowerCase().includes(q))
-          : String(r[state.field]||'').toLowerCase().includes(q));
+    // Buscar por RUT en DATA
+    function buscar() {
+      const input = $("rut").value;
+      const q = normalizeRut(input);
+      if (!q) { $("status").textContent = "Ingresa un RUN"; clearValues(); return; }
+
+      $("buscar").disabled = true;
+      $("status").textContent = "Buscando…";
+
+      // match exacto de RUT (sin puntos/guion)
+      const row = DATA.find(r => equalsRut(r[COLS.rut], q));
+
+      if (row) {
+        setRow(row);
+        $("status").textContent = "OK";
+      } else {
+        clearValues();
+        $("status").textContent = "No encontrado";
       }
-      rows.sort((a,b)=>{
-        const av=String(a[state.sortKey]||''), bv=String(b[state.sortKey]||'');
-        const na=Number(av), nb=Number(bv);
-        const bothNum=av!==''&&bv!==''&&!isNaN(na)&&!isNaN(nb);
-        return bothNum ? (state.sortDir==='asc'?na-nb:nb-na)
-                       : (state.sortDir==='asc'?av.localeCompare(bv):bv.localeCompare(av));
-      });
-      return rows;
+
+      $("buscar").disabled = false;
     }
 
-    function renderTable(rows){
-      const th=document.getElementById('tableHead'); const tb=document.getElementById('tableBody');
-      th.innerHTML=''; tb.innerHTML='';
-      FIELD_ORDER.forEach(h=>{ const t=document.createElement('th'); t.className='text-left px-4 py-3 whitespace-nowrap'; t.textContent=h; th.appendChild(t); });
-      rows.forEach((r,i)=>{
-        const tr=document.createElement('tr'); tr.className=(i%2?'bg-gray-50':'bg-white');
-        FIELD_ORDER.forEach(h=>{ const td=document.createElement('td'); td.className='px-4 py-2 whitespace-nowrap'; td.textContent=r[h]??''; tr.appendChild(td); });
-        tb.appendChild(tr);
-      });
-    }
-
-    function renderCards(rows){
-      const c=document.getElementById('cards'); c.innerHTML='';
-      rows.forEach(r=>{
-        const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-4';
-        card.innerHTML =
-          '<div class="flex items-center justify-between mb-2">'+
-          '  <div class="font-semibold">Cartola #'+(r['N° CARTOLA INTERNA']||'—')+'</div>'+
-          '  <div class="text-xs text-gray-500">Familia '+(r['N° FAMILIA']||'—')+'</div>'+
-          '</div>'+
-          '<div class="text-sm space-y-1">'+
-          '  <div><span class="text-gray-500">Nombre: </span>'+(['Nombres','Apellido Paterno','Apellido Materno'].map(k=>r[k]||'').filter(Boolean).join(' ')||'—')+'</div>'+
-          '  <div><span class="text-gray-500">Dirección: </span>'+(r['DIRECCIÓN']||'—')+'</div>'+
-          '  <div><span class="text-gray-500">Teléfono: </span>'+(r['NUMERO DE CONTACTO PRINCIPAL']||'—')+'</div>'+
-          '  <div><span class="text-gray-500">Sector: </span>'+(r['SECTOR']||'—')+'</div>'+
-          '  <div><span class="text-gray-500">Riesgo: </span>'+(r['Clasificación del Riesgo Familiar']||'—')+'</div>'+
-          '</div>';
-        c.appendChild(card);
-      });
-    }
-
-    function render(){
-      const err=document.getElementById('error');
-      if(state.error){ err.textContent=state.error; err.classList.remove('hidden'); } else { err.classList.add('hidden'); }
-      renderControls();
-      document.getElementById('loading').style.display = state.loading ? '' : 'none';
-      const rows=computeFiltered();
-      document.getElementById('count').textContent = rows.length.toLocaleString() + ' resultado(s)';
-      if(!state.loading && !state.error){ renderTable(rows); renderCards(rows); }
-    }
-
-    // ===== Carga de datos desde Apps Script Web App =====
-    function loadData(){
-      setState({ loading:true, error:'' });
-      fetch(API_URL, { mode: 'cors' })
-        .then(async r => {
-          const ct = r.headers.get('content-type') || '';
-          const text = await r.text();
-          // Si por error devolvió HTML (doctype), avisamos:
-          if (!ct.includes('application/json') && text.trim().startsWith('<!doctype')) {
-            throw new Error('La API devolvió HTML. ¿Usas la URL /exec del Web App con acceso público y ?action=data?');
-          }
-          const j = JSON.parse(text);
-          if (!j || !j.ok) throw new Error(j?.error || 'Respuesta inválida de la API.');
-          setState({ data: j.rows, loading:false });
-        })
-        .catch(err => setState({ error: err.message || 'No se pudo cargar la hoja.', loading:false }));
+    // Cargar datos al iniciar
+    async function loadData() {
+      $("status").textContent = "Cargando datos…";
+      try {
+        const r = await fetch(API_URL, { mode:'cors' });
+        const ct = r.headers.get('content-type') || '';
+        const text = await r.text();
+        if (!ct.includes('application/json') && text.trim().startsWith('<!doctype')) {
+          throw new Error("La API devolvió HTML. Revisa que sea la URL /exec con ?action=data y acceso público.");
+        }
+        const j = JSON.parse(text);
+        if (!j || !j.ok) throw new Error(j?.error || "Respuesta inválida.");
+        DATA = Array.isArray(j.rows) ? j.rows : [];
+        $("status").textContent = "Listo";
+      } catch (e) {
+        $("status").textContent = "Error al cargar";
+        console.error(e);
+      }
     }
 
     // Eventos
-    document.getElementById('q').addEventListener('input', debounce(e=>setState({ q:e.target.value }),200));
-    document.getElementById('field').addEventListener('change', e=>setState({ field:e.target.value }));
-    document.getElementById('sortKey').addEventListener('change', e=>setState({ sortKey:e.target.value }));
-    document.getElementById('sortDir').addEventListener('click', ()=>setState({ sortDir: state.sortDir==='asc'?'desc':'asc' }));
+    $("buscar").addEventListener("click", buscar);
+    $("rut").addEventListener("keydown", (e) => { if (e.key === "Enter") buscar(); });
 
     // Init
-    (function init(){ renderControls(); loadData(); render(); })();
+    loadData();
   </script>
 </body>
 </html>
