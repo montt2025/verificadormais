@@ -1,200 +1,165 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Verificador de Cartolas MAIS</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    .cell{padding:.5rem .75rem;border-bottom:1px solid #d1d5db}
-    .cell-label{background:#e5f0ff;font-weight:600}
-    .card{box-shadow:0 10px 25px rgba(0,0,0,.06);border-radius:.75rem;overflow:hidden;border:1px solid #e5e7eb}
-    .hdr{background:linear-gradient(180deg,#5aa2ff,#2768c9);color:#fff}
-    .note{background:#fff6bf;color:#6b7280;border-bottom:1px solid #e5e7eb}
-    .val{min-height:2.25rem;display:flex;align-items:center}
-    .pill{display:inline-block;background:#eff6ff;color:#1f2937;border:1px solid #dbeafe;border-radius:9999px;padding:.125rem .5rem;font-size:.75rem}
-    .btn{background:#2563eb;color:#fff;border-radius:.5rem;padding:.5rem .9rem}
-    .btn:disabled{opacity:.6}
-    input[type="text"]{outline:none}
-  </style>
-</head>
-<body class="bg-gray-50 text-gray-900">
-  <div class="min-h-screen flex items-start justify-center p-4">
-    <div class="w-full max-w-2xl card bg-white">
-      <!-- Encabezado -->
-      <div class="hdr p-4">
-        <h1 class="text-xl font-bold tracking-wide">VERIFICADOR DE CARTOLAS MAIS</h1>
-        <div class="text-sm opacity-95">(Ingresar Run del paciente índice o familiares)</div>
-      </div>
-      <!-- Nota -->
-      <div class="note px-4 py-2 text-sm">
-        <span class="pill mr-2">RUN sin puntos</span> con guión y dígito verificador (ej: 5186407-7)
-      </div>
+<script>
+  // ⬇️ Tu API de Apps Script (/exec?action=data)
+  const API_URL = "https://script.google.com/macros/s/AKfycbyR5m1lAB5RUMqcmzc20Yrb8Fm2QL9qV7TSsEO-Fdr4jNidmmzvYcrMH1gWKIioKSJG/exec?action=data";
 
-      <!-- Cuerpo tipo “tabla” -->
-      <div>
-        <!-- Fila: Ingresar RUN -->
-        <div class="grid grid-cols-3 sm:grid-cols-4">
-          <div class="cell cell-label col-span-1">Ingresar R.U.N</div>
-          <div class="cell col-span-2 sm:col-span-2">
-            <div class="flex gap-2">
-              <input id="rut" type="text" placeholder="12.345.678-9"
-                     class="w-full border rounded-md px-3 py-2" />
-              <button id="buscar" class="btn">Buscar</button>
-            </div>
-          </div>
-          <div class="cell col-span-3 sm:col-span-1 text-right text-sm text-gray-500">
-            <span id="status" class="align-middle"></span>
-          </div>
-        </div>
+  // ========= Utiles generales =========
+  const $ = (id) => document.getElementById(id);
+  function deb(fn, d){ let t=0; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), d||250); }; }
 
-        <!-- Fila: Nombre -->
-        <div class="grid grid-cols-3 sm:grid-cols-4">
-          <div class="cell cell-label">Nombre</div>
-          <div class="cell val col-span-2 sm:col-span-3" id="vNombre">—</div>
-        </div>
+  // Normaliza encabezados (quita acentos, espacios/puntuación y pone MAYÚSC.)
+  function normHeader(s){
+    return String(s||"")
+      .normalize("NFD").replace(/[\u0300-\u036f]/g,"")   // sin acentos
+      .toUpperCase().replace(/[^A-Z0-9]/g,"");           // solo A-Z0-9
+  }
 
-        <!-- Fila: N° de Cartola -->
-        <div class="grid grid-cols-3 sm:grid-cols-4">
-          <div class="cell cell-label">N° de Cartola</div>
-          <div class="cell val col-span-2 sm:col-span-3" id="vCartola">—</div>
-        </div>
+  // Normaliza RUT/RUN: quita puntos/espacios, deja dígitos y K, y compara sin guion
+  function normalizeRut(r){
+    return String(r||"")
+      .toUpperCase()
+      .replace(/\./g,"").replace(/\s+/g,"")
+      .replace(/[^0-9K-]/g,"")
+      .replace(/-/g,""); // comparamos sin guion
+  }
+  function equalsRut(a,b){ return normalizeRut(a) === normalizeRut(b); }
 
-        <!-- Fila: N° de Familia -->
-        <div class="grid grid-cols-3 sm:grid-cols-4">
-          <div class="cell cell-label">N° de Familia</div>
-          <div class="cell val col-span-2 sm:col-span-3" id="vFamilia">—</div>
-        </div>
+  // Sinónimos por campo (versiones normalizadas, se hace "includes")
+  const FIELD_SYNONYMS = {
+    rut: [
+      "RUT","RUN","RUNSINPUNTOS","RUTSINPUNTOS","RUTRUN",
+      "RUNCONGUION","RUTCONGUION","RUNSINDOSPUNTOS","RUTSINDOSPUNTOS",
+      "RUNSINGUION","R.U.N"
+    ],
+    cartola: ["NCARTOLAINTERNA","NDECARTOLA","NUMERODECARTOLA","CARTOLA"],
+    familia: ["NFAMILIA","NDEFAMILIA","NUMERODEFAMILIA","FAMILIA"],
+    nombres: ["NOMBRES","NOMBRE","NOMBRESAPELLIDOS","NOMBRE(S)"],
+    apPat: ["APELLIDOPATERNO","APPATERNO","AP.PATERNO","PATERNO"],
+    apMat: ["APELLIDOMATERNO","APMATERNO","AP.MATERNO","MATERNO"],
+    direccion: ["DIRECCION","DIRECCIONDOMICILIO","DOMICILIO","DIRECCIÓN"],
+    telefono: ["NUMERODECONTACTOPRINCIPAL","TELEFONO","TELEFONO1","TEL","CONTACTO","FONO","NUMEROTELEFONO"],
+    sector: ["SECTOR"],
+    riesgo: ["CLASIFICACIONDELRIESGOFAMILIAR","CLASIFICACIONDERIESGO","CLASIFICACIONRIESGO","RIESGO"]
+  };
 
-        <!-- Fila: Dirección -->
-        <div class="grid grid-cols-3 sm:grid-cols-4">
-          <div class="cell cell-label">Dirección</div>
-          <div class="cell val col-span-2 sm:col-span-3" id="vDireccion">—</div>
-        </div>
-
-        <!-- Fila: Telefono -->
-        <div class="grid grid-cols-3 sm:grid-cols-4">
-          <div class="cell cell-label">Telefono</div>
-          <div class="cell val col-span-2 sm:col-span-3" id="vTelefono">—</div>
-        </div>
-
-        <!-- Fila: Sector -->
-        <div class="grid grid-cols-3 sm:grid-cols-4">
-          <div class="cell cell-label">Sector</div>
-          <div class="cell val col-span-2 sm:col-span-3" id="vSector">—</div>
-        </div>
-
-        <!-- Fila: Riesgo -->
-        <div class="grid grid-cols-3 sm:grid-cols-4">
-          <div class="cell cell-label">Riesgo</div>
-          <div class="cell val col-span-2 sm:col-span-3" id="vRiesgo">—</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // ⬇️ Cambia por tu URL de Apps Script Web App (deployment /exec) con ?action=data
-    const API_URL = "https://script.google.com/macros/s/AKfycbyR5m1lAB5RUMqcmzc20Yrb8Fm2QL9qV7TSsEO-Fdr4jNidmmzvYcrMH1gWKIioKSJG/exec?action=data";
-
-    // Nombres de columnas del Sheet (deben existir tal cual)
-    const COLS = {
-      rut: "RUT",
-      cartola: "N° CARTOLA INTERNA",
-      familia: "N° FAMILIA",
-      nombres: "Nombres",
-      apPat: "Apellido Paterno",
-      apMat: "Apellido Materno",
-      direccion: "DIRECCIÓN",
-      telefono: "NUMERO DE CONTACTO PRINCIPAL",
-      sector: "SECTOR",
-      riesgo: "Clasificación del Riesgo Familiar"
+  // Construye un mapa de columnas detectadas a partir de la PRIMERA fila
+  function buildKeyMap(sampleRow){
+    const headers = Object.keys(sampleRow||{}).map(k => [k, normHeader(k)]);
+    const pick = (synList) => {
+      for (const [orig, norm] of headers){
+        if (synList.some(s => norm.includes(s))) return orig;
+      }
+      return null;
     };
+    return {
+      rut      : pick(FIELD_SYNONYMS.rut),
+      cartola  : pick(FIELD_SYNONYMS.cartola),
+      familia  : pick(FIELD_SYNONYMS.familia),
+      nombres  : pick(FIELD_SYNONYMS.nombres),
+      apPat    : pick(FIELD_SYNONYMS.apPat),
+      apMat    : pick(FIELD_SYNONYMS.apMat),
+      direccion: pick(FIELD_SYNONYMS.direccion),
+      telefono : pick(FIELD_SYNONYMS.telefono),
+      sector   : pick(FIELD_SYNONYMS.sector),
+      riesgo   : pick(FIELD_SYNONYMS.riesgo)
+    };
+  }
 
-    // Estado
-    let DATA = []; // filas del sheet
+  // Estado
+  let DATA = [];
+  let KEYMAP = null;
 
-    // Helpers
-    const $ = (id) => document.getElementById(id);
-    function normalizeRut(r) {
-      if (!r) return "";
-      return String(r).toUpperCase()
-        .replace(/\./g, "").replace(/\s+/g, "")
-        .replace(/[^0-9K-]/g, "");           // deja dígitos, K y guion
+  function joinName(row){
+    const get = (k)=> row[KEYMAP[k]] ?? "";
+    const parts = [get("nombres"), get("apPat"), get("apMat")]
+      .map(x => String(x||"").trim())
+      .filter(Boolean);
+    return parts.join(" ").toUpperCase() || "—";
+  }
+  function setRow(row){
+    const get = (k)=> row[KEYMAP[k]] ?? "—";
+    $("vNombre").textContent    = joinName(row);
+    $("vCartola").textContent   = get("cartola");
+    $("vFamilia").textContent   = get("familia");
+    $("vDireccion").textContent = get("direccion");
+    $("vTelefono").textContent  = get("telefono");
+    $("vSector").textContent    = get("sector");
+    $("vRiesgo").textContent    = get("riesgo");
+  }
+  function clearValues(){
+    ["vNombre","vCartola","vFamilia","vDireccion","vTelefono","vSector","vRiesgo"]
+      .forEach(id => $(id).textContent = "—");
+  }
+
+  function showMissingCols(){
+    const available = Object.keys(DATA[0]||{});
+    const missing = Object.entries(KEYMAP).filter(([k,v])=>!v).map(([k])=>k);
+    const msg = [
+      "No pude detectar todas las columnas necesarias.",
+      "Faltan: " + (missing.join(", ") || "—"),
+      "Encabezados disponibles en la hoja: " + (available.join(" | ") || "—")
+    ].join("  ·  ");
+    $("status").textContent = msg;
+  }
+
+  // Buscar por RUN
+  function buscar(){
+    const input = $("rut").value;
+    const q = normalizeRut(input);
+    if (!q){ $("status").textContent = "Ingresa un RUN"; clearValues(); return; }
+    $("buscar").disabled = true;
+    $("status").textContent = "Buscando…";
+
+    if (!KEYMAP || !KEYMAP.rut){ showMissingCols(); $("buscar").disabled=false; return; }
+
+    // Busca coincidencia exacta (normalizada)
+    let found = DATA.find(r => equalsRut(String(r[KEYMAP.rut]||""), q));
+
+    // Si no encontró, intenta con trimming extra (por si vienen ceros o espacios raros)
+    if (!found){
+      found = DATA.find(r => normalizeRut(String(r[KEYMAP.rut]||"")).endsWith(q));
     }
-    function equalsRut(a,b){
-      const x = normalizeRut(a).replace(/-/g, "");
-      const y = normalizeRut(b).replace(/-/g, "");
-      return x === y;
-    }
-    function joinName(row){
-      const parts = [row[COLS.nombres], row[COLS.apPat], row[COLS.apMat]]
-        .map(x => (x||"").toString().trim()).filter(Boolean);
-      return parts.join(" ").toUpperCase() || "—";
-    }
-    function setRow(row){
-      $("vNombre").textContent   = joinName(row);
-      $("vCartola").textContent  = row[COLS.cartola]  ?? "—";
-      $("vFamilia").textContent  = row[COLS.familia]  ?? "—";
-      $("vDireccion").textContent= row[COLS.direccion]?? "—";
-      $("vTelefono").textContent = row[COLS.telefono] ?? "—";
-      $("vSector").textContent   = row[COLS.sector]   ?? "—";
-      $("vRiesgo").textContent   = row[COLS.riesgo]   ?? "—";
-    }
-    function clearValues(){
-      ["vNombre","vCartola","vFamilia","vDireccion","vTelefono","vSector","vRiesgo"]
-        .forEach(id => $(id).textContent = "—");
-    }
 
-    // Buscar por RUT en DATA
-    function buscar() {
-      const input = $("rut").value;
-      const q = normalizeRut(input);
-      if (!q) { $("status").textContent = "Ingresa un RUN"; clearValues(); return; }
+    if (found){
+      setRow(found);
+      $("status").textContent = "OK";
+    } else {
+      clearValues();
+      $("status").textContent = "No encontrado";
+    }
+    $("buscar").disabled = false;
+  }
 
-      $("buscar").disabled = true;
-      $("status").textContent = "Buscando…";
+  // Carga de datos
+  async function loadData(){
+    $("status").textContent = "Cargando datos…";
+    try{
+      const r = await fetch(API_URL, { mode:'cors' });
+      const txt = await r.text();
+      // Si por error vuelve HTML
+      if (txt.trim().startsWith("<!doctype")) throw new Error("La API devolvió HTML. Revisa permisos/URL.");
+      const j = JSON.parse(txt);
+      if (!j || !j.ok) throw new Error(j?.error || "Respuesta inválida.");
+      DATA = Array.isArray(j.rows) ? j.rows : [];
 
-      // match exacto de RUT (sin puntos/guion)
-      const row = DATA.find(r => equalsRut(r[COLS.rut], q));
-
-      if (row) {
-        setRow(row);
-        $("status").textContent = "OK";
-      } else {
-        clearValues();
-        $("status").textContent = "No encontrado";
+      if (DATA.length === 0){
+        $("status").textContent = "Sin filas en la hoja.";
+        return;
       }
+      KEYMAP = buildKeyMap(DATA[0]);
 
-      $("buscar").disabled = false;
+      // Si falta alguna clave importante, mostramos qué hay
+      if (!KEYMAP.rut) showMissingCols();
+      else $("status").textContent = "Listo";
+    } catch(e){
+      $("status").textContent = "Error: " + (e.message || e);
+      console.error(e);
     }
+  }
 
-    // Cargar datos al iniciar
-    async function loadData() {
-      $("status").textContent = "Cargando datos…";
-      try {
-        const r = await fetch(API_URL, { mode:'cors' });
-        const ct = r.headers.get('content-type') || '';
-        const text = await r.text();
-        if (!ct.includes('application/json') && text.trim().startsWith('<!doctype')) {
-          throw new Error("La API devolvió HTML. Revisa que sea la URL /exec con ?action=data y acceso público.");
-        }
-        const j = JSON.parse(text);
-        if (!j || !j.ok) throw new Error(j?.error || "Respuesta inválida.");
-        DATA = Array.isArray(j.rows) ? j.rows : [];
-        $("status").textContent = "Listo";
-      } catch (e) {
-        $("status").textContent = "Error al cargar";
-        console.error(e);
-      }
-    }
+  // Eventos
+  $("buscar").addEventListener("click", buscar);
+  $("rut").addEventListener("keydown", (e)=>{ if (e.key === "Enter") buscar(); });
 
-    // Eventos
-    $("buscar").addEventListener("click", buscar);
-    $("rut").addEventListener("keydown", (e) => { if (e.key === "Enter") buscar(); });
-
-    // Init
-    loadData();
-  </script>
-</body>
-</html>
+  // Init
+  loadData();
+</script>
