@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Buscador CFM – Web Responsivo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .chip{display:inline-block;padding:.15rem .5rem;border:1px solid #e5e7eb;border-radius:9999px;font-size:.75rem;color:#6b7280}
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div class="min-h-screen">
+    <header class="sticky top-0 z-10 backdrop-blur bg-white/70 border-b">
+      <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <h1 class="text-2xl font-semibold">Buscador CFM – Web Responsivo</h1>
+        <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+          <input id="q" placeholder="Buscar… (RUT, Nombre, Dirección, Cartola, etc.)"
+                 class="w-full md:w-96 rounded-2xl border px-4 py-2 focus:outline-none focus:ring"/>
+          <select id="field" class="rounded-2xl border px-3 py-2"></select>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-6 space-y-4">
+      <div id="error" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm"></div>
+
+      <div class="flex items-center gap-2 text-sm">
+        <span class="text-gray-600">Ordenar por:</span>
+        <select id="sortKey" class="rounded-xl border px-2 py-1"></select>
+        <button id="sortDir" class="rounded-xl border px-3 py-1" title="Cambiar orden">Ascendente</button>
+        <span id="count" class="ml-auto text-gray-500">0 resultado(s)</span>
+      </div>
+
+      <div id="loading" class="p-6 rounded-2xl bg-white shadow">Cargando datos…</div>
+
+      <!-- Tabla desktop -->
+      <div class="hidden md:block">
+        <div class="overflow-auto rounded-2xl shadow">
+          <table class="min-w-full text-sm bg-white">
+            <thead class="bg-gray-100"><tr id="tableHead"></tr></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tarjetas móvil -->
+      <div id="cards" class="grid md:hidden gap-3"></div>
+
+      <div class="bg-white rounded-2xl p-4 shadow border">
+        <div class="font-semibold mb-2">Ayuda</div>
+        <div class="text-sm text-gray-600">
+          Si aparece <span class="chip">Unexpected token &lt;</span>, la API devolvió HTML (revisa URL/permiso).
+        </div>
+      </div>
+    </main>
+
+    <footer class="max-w-6xl mx-auto px-4 py-8 text-sm text-gray-500">
+      <p>Si cambian los encabezados en la hoja, actualiza FIELD_ORDER y FILTERABLE_FIELDS.</p>
+    </footer>
+  </div>
+
+  <script>
+    // ===== Config =====
+    // 🔁 Reemplaza por tu URL de Web App de Apps Script (deployment /exec) + ?action=data
+    const API_URL = "https://script.google.com/macros/s/TU_DEPLOY_ID/exec?action=data";
+
+    const FIELD_ORDER = [
+      "N° CARTOLA INTERNA","N° FAMILIA","Nombres","Apellido Paterno","Apellido Materno",
+      "DIRECCIÓN","NUMERO DE CONTACTO PRINCIPAL","SECTOR","Clasificación del Riesgo Familiar",
+    ];
+    const FILTERABLE_FIELDS = [
+      { key:"todos",label:"Todos los campos" },
+      { key:"N° CARTOLA INTERNA",label:"N° Cartola Interna" },
+      { key:"N° FAMILIA",label:"N° Familia" },
+      { key:"RUT",label:"RUT" },
+      { key:"Nombres",label:"Nombres" },
+      { key:"DIRECCIÓN",label:"Dirección" },
+      { key:"NUMERO DE CONTACTO PRINCIPAL",label:"Teléfono" },
+      { key:"SECTOR",label:"Sector" },
+      { key:"Clasificación del Riesgo Familiar",label:"Clasificación de Riesgo" },
+    ];
+
+    // ===== Util =====
+    function debounce(fn, d){ let t=0; return function(){ clearTimeout(t); const a=arguments,c=this; t=setTimeout(()=>fn.apply(c,a), d||250); }; }
+
+    // ===== Estado =====
+    var state = { data:[], loading:true, error:"", q:"", field:"todos", sortKey:FIELD_ORDER[0], sortDir:"asc" };
+    function setState(p){ state=Object.assign({}, state, p); render(); }
+
+    function renderControls(){
+      const f=document.getElementById('field'); f.innerHTML='';
+      FILTERABLE_FIELDS.forEach(x=>{ const o=document.createElement('option'); o.value=x.key; o.textContent=x.label; if(state.field===x.key)o.selected=true; f.appendChild(o); });
+      const s=document.getElementById('sortKey'); s.innerHTML='';
+      FIELD_ORDER.forEach(h=>{ const o=document.createElement('option'); o.value=h; o.textContent=h; if(state.sortKey===h)o.selected=true; s.appendChild(o); });
+      document.getElementById('sortDir').textContent = (state.sortDir==='asc'?'Ascendente':'Descendente');
+    }
+
+    function computeFiltered(){
+      const q=String(state.q||'').trim().toLowerCase();
+      let rows=state.data.slice();
+      if(q){
+        rows=rows.filter(r=> state.field==='todos'
+          ? FIELD_ORDER.some(f=>String(r[f]||'').toLowerCase().includes(q))
+          : String(r[state.field]||'').toLowerCase().includes(q));
+      }
+      rows.sort((a,b)=>{
+        const av=String(a[state.sortKey]||''), bv=String(b[state.sortKey]||'');
+        const na=Number(av), nb=Number(bv);
+        const bothNum=av!==''&&bv!==''&&!isNaN(na)&&!isNaN(nb);
+        return bothNum ? (state.sortDir==='asc'?na-nb:nb-na)
+                       : (state.sortDir==='asc'?av.localeCompare(bv):bv.localeCompare(av));
+      });
+      return rows;
+    }
+
+    function renderTable(rows){
+      const th=document.getElementById('tableHead'); const tb=document.getElementById('tableBody');
+      th.innerHTML=''; tb.innerHTML='';
+      FIELD_ORDER.forEach(h=>{ const t=document.createElement('th'); t.className='text-left px-4 py-3 whitespace-nowrap'; t.textContent=h; th.appendChild(t); });
+      rows.forEach((r,i)=>{
+        const tr=document.createElement('tr'); tr.className=(i%2?'bg-gray-50':'bg-white');
+        FIELD_ORDER.forEach(h=>{ const td=document.createElement('td'); td.className='px-4 py-2 whitespace-nowrap'; td.textContent=r[h]??''; tr.appendChild(td); });
+        tb.appendChild(tr);
+      });
+    }
+
+    function renderCards(rows){
+      const c=document.getElementById('cards'); c.innerHTML='';
+      rows.forEach(r=>{
+        const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-4';
+        card.innerHTML =
+          '<div class="flex items-center justify-between mb-2">'+
+          '  <div class="font-semibold">Cartola #'+(r['N° CARTOLA INTERNA']||'—')+'</div>'+
+          '  <div class="text-xs text-gray-500">Familia '+(r['N° FAMILIA']||'—')+'</div>'+
+          '</div>'+
+          '<div class="text-sm space-y-1">'+
+          '  <div><span class="text-gray-500">Nombre: </span>'+(['Nombres','Apellido Paterno','Apellido Materno'].map(k=>r[k]||'').filter(Boolean).join(' ')||'—')+'</div>'+
+          '  <div><span class="text-gray-500">Dirección: </span>'+(r['DIRECCIÓN']||'—')+'</div>'+
+          '  <div><span class="text-gray-500">Teléfono: </span>'+(r['NUMERO DE CONTACTO PRINCIPAL']||'—')+'</div>'+
+          '  <div><span class="text-gray-500">Sector: </span>'+(r['SECTOR']||'—')+'</div>'+
+          '  <div><span class="text-gray-500">Riesgo: </span>'+(r['Clasificación del Riesgo Familiar']||'—')+'</div>'+
+          '</div>';
+        c.appendChild(card);
+      });
+    }
+
+    function render(){
+      const err=document.getElementById('error');
+      if(state.error){ err.textContent=state.error; err.classList.remove('hidden'); } else { err.classList.add('hidden'); }
+      renderControls();
+      document.getElementById('loading').style.display = state.loading ? '' : 'none';
+      const rows=computeFiltered();
+      document.getElementById('count').textContent = rows.length.toLocaleString() + ' resultado(s)';
+      if(!state.loading && !state.error){ renderTable(rows); renderCards(rows); }
+    }
+
+    // ===== Carga de datos desde Apps Script Web App =====
+    function loadData(){
+      setState({ loading:true, error:'' });
+      fetch(API_URL, { mode: 'cors' })
+        .then(async r => {
+          const ct = r.headers.get('content-type') || '';
+          const text = await r.text();
+          // Si por error devolvió HTML (doctype), avisamos:
+          if (!ct.includes('application/json') && text.trim().startsWith('<!doctype')) {
+            throw new Error('La API devolvió HTML. ¿Usas la URL /exec del Web App con acceso público y ?action=data?');
+          }
+          const j = JSON.parse(text);
+          if (!j || !j.ok) throw new Error(j?.error || 'Respuesta inválida de la API.');
+          setState({ data: j.rows, loading:false });
+        })
+        .catch(err => setState({ error: err.message || 'No se pudo cargar la hoja.', loading:false }));
+    }
+
+    // Eventos
+    document.getElementById('q').addEventListener('input', debounce(e=>setState({ q:e.target.value }),200));
+    document.getElementById('field').addEventListener('change', e=>setState({ field:e.target.value }));
+    document.getElementById('sortKey').addEventListener('change', e=>setState({ sortKey:e.target.value }));
+    document.getElementById('sortDir').addEventListener('click', ()=>setState({ sortDir: state.sortDir==='asc'?'desc':'asc' }));
+
+    // Init
+    (function init(){ renderControls(); loadData(); render(); })();
+  </script>
+</body>
+</html>
